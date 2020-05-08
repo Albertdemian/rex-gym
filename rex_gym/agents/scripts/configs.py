@@ -25,9 +25,9 @@ def default():
     """Default configuration for PPO."""
     # General
     algorithm = ppo.PPOAlgorithm
-    num_agents = 25
+    num_agents = 10
     eval_episodes = 25
-    use_gpu = False
+    use_gpu = True
     # Network
     network = networks.ForwardGaussianPolicy
     weight_summaries = dict(all=r'.*', policy=r'.*/policy/.*', value=r'.*/value/.*')

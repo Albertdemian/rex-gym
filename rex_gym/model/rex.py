@@ -662,29 +662,30 @@ class Rex(object):
                                                               motor_commands_with_direction):
                 self._SetDesiredMotorAngleById(motor_id, motor_command_with_direction)
 
-    # def ConvertFromLegModel(self, actions):
-    #     """Convert the actions that use leg model to the real motor actions.
-    #
-    # Args:
-    #   actions: The theta, phi of the leg model.
-    # Returns:
-    #   The eight desired motor angles that can be used in ApplyActions().
-    # """
-    #     motor_angle = copy.deepcopy(actions)
-    #     scale_for_singularity = 1
-    #     offset_for_singularity = 1.5
-    #     half_num_motors = int(self.num_motors / 2)
-    #     quater_pi = math.pi / 4
-    #     for i in range(self.num_motors):
-    #         action_idx = int(i // 2)
-    #         forward_backward_component = (
-    #                 -scale_for_singularity * quater_pi *
-    #                 (actions[action_idx + half_num_motors] + offset_for_singularity))
-    #         extension_component = (-1) ** i * quater_pi * actions[action_idx]
-    #         if i >= half_num_motors:
-    #             extension_component = -extension_component
-    #         motor_angle[i] = (math.pi + forward_backward_component + extension_component)
-    #     return motor_angle
+    def ConvertFromLegModel(self, actions):
+        """Convert the actions that use leg model to the real motor actions.
+    
+         Args:
+           actions: The theta, phi of the leg model.
+         Returns:
+           The eight desired motor angles that can be used in ApplyActions().
+       """
+        motor_angle = copy.deepcopy(actions)
+
+        scale_for_singularity = 1
+        offset_for_singularity = 1.5
+        half_num_motors = int(self.num_motors / 2)
+        quater_pi = math.pi / 4
+        for i in range(self.num_motors):
+            action_idx = int(i // 2)
+            forward_backward_component = (
+                    -scale_for_singularity * quater_pi *
+                    (actions[action_idx + half_num_motors] + offset_for_singularity))
+            extension_component = (-1) ** i * quater_pi * actions[action_idx]
+            if i >= half_num_motors:
+                extension_component = -extension_component
+            motor_angle[i] = (math.pi + forward_backward_component + extension_component)
+        return motor_angle
 
     def GetBaseMassesFromURDF(self):
         """Get the mass of the base from the URDF file."""

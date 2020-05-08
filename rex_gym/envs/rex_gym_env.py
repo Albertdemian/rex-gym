@@ -2,6 +2,7 @@
 
 """
 import math
+import random
 import time
 import gym
 import numpy as np
@@ -12,6 +13,7 @@ from gym.utils import seeding
 from pkg_resources import parse_version
 from ..model import rex, motor
 from ..util import bullet_client
+from ..model.rex import Rex
 
 NUM_MOTORS = 12
 MOTOR_ANGLE_OBSERVATION_INDEX = 0
@@ -26,10 +28,19 @@ SENSOR_NOISE_STDDEV = rex.SENSOR_NOISE_STDDEV
 DEFAULT_URDF_VERSION = "default"
 NUM_SIMULATION_ITERATION_STEPS = 300
 
+
+TARGET_POSITION = [0.0, 0.0, 0.21]
+
 REX_URDF_VERSION_MAP = {
     DEFAULT_URDF_VERSION: rex.Rex
 }
 
+#====================================
+Behavioral_models  = {-1:'Stand',
+                    0:'Walk',
+                    1:'Gallop',
+                    2:'Turn'}
+#=====================================
 
 def convert_to_list(obj):
     try:
@@ -81,7 +92,9 @@ class RexGymEnv(gym.Env):
                  env_randomizer=None,
                  forward_reward_cap=float("inf"),
                  reflection=True,
-                 log_path=None):
+                 log_path=None,
+                 affordance = [-1,-1,-1,-1,-1],
+                 model = 'Walk'):
         """Initialize the rex gym environment.
 
     Args:
@@ -139,7 +152,12 @@ class RexGymEnv(gym.Env):
         rex_logging.proto.
     Raises:
       ValueError: If the urdf_version is not supported.
-    """
+    """ 
+        #Affordance and model
+        #======================
+        self.model = model
+        self.affordance = affordance
+        #=========================
         # Set up logging.
         self._log_path = log_path
         # @TODO fix logging
@@ -221,6 +239,7 @@ class RexGymEnv(gym.Env):
         self._hard_reset = hard_reset  # This assignment need to be after reset()
         self.goal_reached = False
 
+
     def close(self):
         if self._env_step_counter > 0:
             self.logging.save_episode(self._episode_proto)
@@ -229,13 +248,18 @@ class RexGymEnv(gym.Env):
     def add_env_randomizer(self, env_randomizer):
         self._env_randomizers.append(env_randomizer)
 
-    def reset(self, initial_motor_angles=None, reset_duration=1.0):
+    def reset(self, initial_motor_angles=Rex.INIT_POSES['rest_position'], reset_duration=1.0):
         self._pybullet_client.configureDebugVisualizer(self._pybullet_client.COV_ENABLE_RENDERING, 0)
         # @TODO fix logging
         # if self._env_step_counter > 0:
         #     self.logging.save_episode(self._episode_proto)
         # self._episode_proto = rex_logging_pb2.RexEpisode()
         # rex_logging.preallocate_episode_proto(self._episode_proto, self._num_steps_to_log)
+        #===========================
+        self.model = 'Stand'
+        self.affordance = [-1,-1,-1,-1,-1]
+        #=============================
+        
         if self._hard_reset:
             self._pybullet_client.resetSimulation()
             self._pybullet_client.setPhysicsEngineParameter(
@@ -316,11 +340,20 @@ class RexGymEnv(gym.Env):
     Raises:
       ValueError: The action dimension is not the same as the number of motors.
       ValueError: The magnitude of actions is out of bounds.
-    """
+    """ 
+        #=======================================
+        # reset afforcance 
+        #====================================
+        if self._env_step_counter >0 and self._env_step_counter%200 ==0:
+            
+            model_index = random.randint(0,2)
+            self.affordance = np.dot([1,1,1,1,1],model_index)
+
+            self._model = Behavioral_models[model_index]
+
         self._last_base_position = self.rex.GetBasePosition()
         self._last_base_orientation = self.rex.GetBaseOrientation()
-        # print("ACTION:")
-        # print(action)
+
         if self._is_render:
             # Sleep, otherwise the computation takes less time than real time,
             # which will make the visualization like a fast-forward video.
@@ -348,6 +381,8 @@ class RexGymEnv(gym.Env):
         self._env_step_counter += 1
         if done:
             self.rex.Terminate()
+
+        
         return np.array(self._get_observation()), reward, done, {}
 
     def render(self, mode="rgb_array", close=False):
@@ -445,35 +480,115 @@ class RexGymEnv(gym.Env):
         # or position[2] <= 0.12
         return self.is_fallen() or o[1] < -0.13
 
+    #================================================
+    #   Modified Reward
+    #=================================================
     def _reward(self):
-        current_base_position = self.rex.GetBasePosition()
-        # side_penality = -abs(current_base_position[1])
-        # forward direction
-        forward_reward = -current_base_position[0] + self._last_base_position[0]
-        # target_reward = 0.0
-        # if forward_reward >0:
-        #     target_reward = (-current_base_position[0] / 3)
-        # Cap the forward reward if a cap is set.
-        forward_reward = min(forward_reward, self._forward_reward_cap)
-        # Penalty for sideways translation.
-        drift_reward = -abs(current_base_position[1] - self._last_base_position[1])
-        # Penalty for sideways rotation of the body.
-        orientation = self.rex.GetBaseOrientation()
-        rot_matrix = pybullet.getMatrixFromQuaternion(orientation)
-        local_up_vec = rot_matrix[6:]
-        shake_reward = -abs(np.dot(np.asarray([1, 1, 0]), np.asarray(local_up_vec)))
-        energy_reward = -np.abs(
-            np.dot(self.rex.GetMotorTorques(),
-                   self.rex.GetMotorVelocities())) * self._time_step
-        objectives = [forward_reward, energy_reward, drift_reward, shake_reward]
-        weighted_objectives = [o * w for o, w in zip(objectives, self._objective_weights)]
-        reward = sum(weighted_objectives)
-                 # - side_penality
-        self._objectives.append(objectives)
-        # print("REWARD:")
-        # print(reward)
-        return reward
+    
+        def _reward_standup(self):
+            # target position
+            t_pos = [0.0, 0.0, 0.225]
 
+            current_base_position = self.rex.GetBasePosition()
+
+            position_reward = abs(t_pos[0] - current_base_position[0]) + \
+                            abs(t_pos[1] - current_base_position[1]) + \
+                            abs(t_pos[2] - current_base_position[2])
+
+            is_pos = False
+
+            if abs(position_reward) < 0.1:
+                position_reward = 1.0 - position_reward
+                is_pos = True
+            else:
+                position_reward = -position_reward
+
+            if current_base_position[2] > t_pos[2]:
+                position_reward = -1000 - position_reward
+                print("jump!")
+
+            if is_pos:
+                self.goal_reached = True
+
+            reward = position_reward
+            return reward
+
+        def _reward_turn(self):
+            t_orient = [0.0, 0.0, 0.0]
+            current_base_position = self.rex.GetBasePosition()
+            current_base_orientation = self.pybullet_client.getEulerFromQuaternion(self.rex.GetBaseOrientation())
+            proximity_reward = abs(t_orient[0] - current_base_orientation[0]) + \
+                            abs(t_orient[1] - current_base_orientation[1]) + \
+                            abs(t_orient[2] - current_base_orientation[2])
+
+            position_reward = abs(TARGET_POSITION[0] - current_base_position[0]) + \
+                            abs(TARGET_POSITION[1] - current_base_position[1]) + \
+                            abs(TARGET_POSITION[2] - current_base_position[2])
+
+            is_oriented = False
+            is_pos = False
+            if abs(proximity_reward) < 0.1:
+                proximity_reward = 100 - proximity_reward
+                is_oriented = True
+            else:
+                proximity_reward = -proximity_reward
+
+            if abs(position_reward) < 0.1:
+                position_reward = 100 - position_reward
+                is_pos = True
+            else:
+                position_reward = -position_reward
+
+            if is_pos and is_oriented:
+                self.goal_reached = True
+                self.goal_t = self.rex.GetTimeSinceReset()
+
+            reward = position_reward + proximity_reward
+            # print(reward)
+            return reward
+
+        def _reward_walk(self):
+            current_base_position = self.rex.GetBasePosition()
+            # side_penality = -abs(current_base_position[1])
+            # forward direction
+            forward_reward = -current_base_position[0] + self._last_base_position[0]
+            # target_reward = 0.0
+            # if forward_reward >0:
+            #     target_reward = (-current_base_position[0] / 3)
+            # Cap the forward reward if a cap is set.
+            forward_reward = min(forward_reward, self._forward_reward_cap)
+            # Penalty for sideways translation.
+            drift_reward = -abs(current_base_position[1] - self._last_base_position[1])
+            # Penalty for sideways rotation of the body.
+            orientation = self.rex.GetBaseOrientation()
+            rot_matrix = pybullet.getMatrixFromQuaternion(orientation)
+            local_up_vec = rot_matrix[6:]
+            shake_reward = -abs(np.dot(np.asarray([1, 1, 0]), np.asarray(local_up_vec)))
+            energy_reward = -np.abs(
+                np.dot(self.rex.GetMotorTorques(),
+                    self.rex.GetMotorVelocities())) * self._time_step
+            objectives = [forward_reward, energy_reward, drift_reward, shake_reward]
+            weighted_objectives = [o * w for o, w in zip(objectives, self._objective_weights)]
+            reward = sum(weighted_objectives)
+                    # - side_penality
+            self._objectives.append(objectives)
+            # print("REWARD:")
+            # print(reward)
+            return reward
+
+    
+        if self.model == 'Walk' or self.model == 'Gallop':
+            reward = _reward_walk(self)
+        
+        elif self.model == 'Turn Right' or self.model=='Turn Left':
+            reward = _reward_turn(self)
+        
+        elif self.model== 'Stand':
+            reward = _reward_standup(self)
+
+
+        return reward
+    #=================================================
     def get_objectives(self):
         return self._objectives
 
@@ -504,6 +619,9 @@ class RexGymEnv(gym.Env):
         observation.extend(self.rex.GetMotorVelocities().tolist())
         observation.extend(self.rex.GetMotorTorques().tolist())
         observation.extend(list(self.rex.GetBaseOrientation()))
+        #==============
+        observation.extend(self.affordance)
+        #==============
         self._observation = observation
         return self._observation
 
@@ -522,6 +640,10 @@ class RexGymEnv(gym.Env):
         observation.extend(self.rex.GetTrueMotorVelocities().tolist())
         observation.extend(self.rex.GetTrueMotorTorques().tolist())
         observation.extend(list(self.rex.GetTrueBaseOrientation()))
+
+        #================================
+        observation.extend(self.affordance)
+        #==============================
 
         self._true_observation = observation
         return self._true_observation

@@ -48,7 +48,7 @@ class RexReactiveEnv(rex_gym_env.RexGymEnv):
                  motor_kp=1.0,
                  motor_kd=0.015,
                  remove_default_joint_damping=True,
-                 render=False,
+                 render=True,
                  num_steps_to_log=1000,
                  accurate_motor_model_enabled=True,
                  use_angle_in_observation=True,

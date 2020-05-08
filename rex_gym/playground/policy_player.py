@@ -15,7 +15,8 @@ POLICIES = {
     'rex_galloping': ('policies/galloping/balanced', 'model.ckpt-20000000'),
     'rex_walk': ('policies/walking/alternating_legs', 'model.ckpt-16000000'),
     'rex_turn': ('policies/turn', 'model.ckpt-16000000'),
-    'rex_standup': ('policies/standup', 'model.ckpt-10000000')
+    'rex_standup': ('policies/standup', 'model.ckpt-10000000'),
+    'walk_1':('policies/training_res/walk_1_res/20200501T095914-rex_galloping/eval','events.out.tfevents.1588327170.f48e9d8150a0')
 }
 
 

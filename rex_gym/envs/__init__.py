@@ -1,1 +1,1 @@
-from rex_gym.envs import rex_gym_env, gym
+from rex_gym.envs.rex_gym_env import RexGymEnv
