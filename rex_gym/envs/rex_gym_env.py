@@ -39,7 +39,8 @@ REX_URDF_VERSION_MAP = {
 Behavioral_models  = {-1:'Stand',
                     0:'Walk',
                     1:'Gallop',
-                    2:'Turn'}
+                    2:'Turn Right',
+                    3:'Turn Left'}
 #=====================================
 
 def convert_to_list(obj):
@@ -158,6 +159,8 @@ class RexGymEnv(gym.Env):
         self.model = model
         self.affordance = affordance
         #=========================
+        self.reference_base_position = []
+        self.target_orientation = []
         # Set up logging.
         self._log_path = log_path
         # @TODO fix logging
@@ -231,7 +234,7 @@ class RexGymEnv(gym.Env):
         self.reset()
         observation_high = (self._get_observation_upper_bound() + OBSERVATION_EPS)
         observation_low = (self._get_observation_lower_bound() - OBSERVATION_EPS)
-        action_dim = NUM_MOTORS
+        action_dim = NUM_MOTORS+ len(self.affordance)
         action_high = np.array([self._action_bound] * action_dim)
         self.action_space = spaces.Box(-action_high, action_high)
         self.observation_space = spaces.Box(observation_low, observation_high)
@@ -346,10 +349,25 @@ class RexGymEnv(gym.Env):
         #====================================
         if self._env_step_counter >0 and self._env_step_counter%200 ==0:
             
-            model_index = random.randint(0,2)
+            model_index = random.randint(0,3)
             self.affordance = np.dot([1,1,1,1,1],model_index)
 
-            self._model = Behavioral_models[model_index]
+            self.model = Behavioral_models[model_index]
+            print(self.model)
+
+            if self.model =='Turn Right' or self.model=='Turn Left': 
+                
+                self.reference_base_position = self.rex.GetBasePosition()
+                if self.model == 'Turn Right':
+                    target_angle =  random.uniform(-math.pi/4, -math.pi/2)
+                    cur_orient = self.pybullet_client.getEulerFromQuaternion(self.rex.GetBaseOrientation())
+                    self.target_orientation = [0,0,cur_orient[2]+target_angle]
+                elif self.model =='Turn Left':
+                    target_angle =  random.uniform(math.pi/4, math.pi/2)
+                    cur_orient = self.pybullet_client.getEulerFromQuaternion(self.rex.GetBaseOrientation())
+                    self.target_orientation = [0,0,cur_orient[2]+target_angle]
+
+           
 
         self._last_base_position = self.rex.GetBasePosition()
         self._last_base_orientation = self.rex.GetBaseOrientation()
@@ -370,7 +388,7 @@ class RexGymEnv(gym.Env):
         for env_randomizer in self._env_randomizers:
             env_randomizer.randomize_step(self)
 
-        action = self._transform_action_to_motor_command(action)
+        action = self._transform_action_to_motor_command(action[:-len(self.affordance)])
         self.rex.Step(action)
         reward = self._reward()
         done = self._termination()
@@ -470,15 +488,24 @@ class RexGymEnv(gym.Env):
         # distance = math.sqrt(position[0] ** 2 + position[1] ** 2)
         # print("POSITION")
         # print(position)
-        if self.is_fallen():
-            print("IS FALLEN!")
         o = self.rex.GetBaseOrientation()
-        if o[1] < -0.13:
-            print("IS ROTATING!")
-        # if position[2] <= 0.12:
-        #     print("LOW POSITION")
-        # or position[2] <= 0.12
-        return self.is_fallen() or o[1] < -0.13
+        cur_orient = self.pybullet_client.getEulerFromQuaternion(self.rex.GetBaseOrientation())
+        
+        if self.model == 'Stand':
+            roll, pitch, _ = self.rex.GetTrueBaseRollPitchYaw()
+            return math.fabs(roll) > 0.3 or math.fabs(pitch) > 0.5
+        
+        else:
+            if position[2] < 0.13:
+                print("IS FALLEN!")
+            
+            if self.is_fallen():
+                print("IS ROTATING!")
+            # if position[2] <= 0.12:
+            #     print("LOW POSITION")
+            # or position[2] <= 0.12
+            return self.is_fallen() or position[2] < 0.13
+
 
     #================================================
     #   Modified Reward
@@ -514,7 +541,8 @@ class RexGymEnv(gym.Env):
             return reward
 
         def _reward_turn(self):
-            t_orient = [0.0, 0.0, 0.0]
+            t_orient = self.target_orientation
+            TARGET_POSITION = self.reference_base_position
             current_base_position = self.rex.GetBasePosition()
             current_base_orientation = self.pybullet_client.getEulerFromQuaternion(self.rex.GetBaseOrientation())
             proximity_reward = abs(t_orient[0] - current_base_orientation[0]) + \
@@ -584,6 +612,7 @@ class RexGymEnv(gym.Env):
             reward = _reward_turn(self)
         
         elif self.model== 'Stand':
+            
             reward = _reward_standup(self)
 
 
@@ -661,6 +690,7 @@ class RexGymEnv(gym.Env):
         upper_bound[num_motors:2 * num_motors] = (motor.MOTOR_SPEED_LIMIT)  # Joint velocity.
         upper_bound[2 * num_motors:3 * num_motors] = (motor.OBSERVED_TORQUE_LIMIT)  # Joint torque.
         upper_bound[3 * num_motors:] = 1.0  # Quaternion of base orientation.
+        upper_bound[-len(self.affordance):] = 5
         return upper_bound
 
     def _get_observation_lower_bound(self):
