@@ -486,11 +486,9 @@ class RexGymEnv(gym.Env):
 
     def _termination(self):
         position = self.rex.GetBasePosition()
-        # distance = math.sqrt(position[0] ** 2 + position[1] ** 2)
-        # print("POSITION")
-        # print(position)
+        
         o = self.rex.GetBaseOrientation()
-        cur_orient = self.pybullet_client.getEulerFromQuaternion(self.rex.GetBaseOrientation())
+        
         
         if self.model == 'Stand':
             roll, pitch, _ = self.rex.GetTrueBaseRollPitchYaw()
@@ -502,9 +500,7 @@ class RexGymEnv(gym.Env):
             
             if self.is_fallen():
                 print("IS ROTATING!")
-            # if position[2] <= 0.12:
-            #     print("LOW POSITION")
-            # or position[2] <= 0.12
+         
             return self.is_fallen() or position[2] < 0.13
 
 
