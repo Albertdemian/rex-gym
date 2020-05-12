@@ -234,7 +234,7 @@ class RexGymEnv(gym.Env):
         self.reset()
         observation_high = (self._get_observation_upper_bound() + OBSERVATION_EPS)
         observation_low = (self._get_observation_lower_bound() - OBSERVATION_EPS)
-        action_dim = NUM_MOTORS+ len(self.affordance)
+        action_dim = NUM_MOTORS
         action_high = np.array([self._action_bound] * action_dim)
         self.action_space = spaces.Box(-action_high, action_high)
         self.observation_space = spaces.Box(observation_low, observation_high)
@@ -389,7 +389,7 @@ class RexGymEnv(gym.Env):
         for env_randomizer in self._env_randomizers:
             env_randomizer.randomize_step(self)
 
-        action = self._transform_action_to_motor_command(action[:-len(self.affordance)])
+        action = self._transform_action_to_motor_command(action)
         self.rex.Step(action)
         reward = self._reward()
         done = self._termination()
@@ -577,6 +577,14 @@ class RexGymEnv(gym.Env):
             # side_penality = -abs(current_base_position[1])
             # forward direction
             forward_reward = -current_base_position[0] + self._last_base_position[0]
+            behavior_reward = 0.0
+            if self.model =='Walk': 
+                if abs(forward_reward) <= 0.15:
+                    behavior_reward = 100 - abs(forward_reward)
+            elif self.model == 'Gallop': 
+                if abs(forward_reward) >= 0.2:
+                    behavior_reward = 100 - abs(forward_reward)
+
             # target_reward = 0.0
             # if forward_reward >0:
             #     target_reward = (-current_base_position[0] / 3)
@@ -592,7 +600,7 @@ class RexGymEnv(gym.Env):
             energy_reward = -np.abs(
                 np.dot(self.rex.GetMotorTorques(),
                     self.rex.GetMotorVelocities())) * self._time_step
-            objectives = [forward_reward, energy_reward, drift_reward, shake_reward]
+            objectives = [forward_reward, behavior_reward, energy_reward, drift_reward, shake_reward]
             weighted_objectives = [o * w for o, w in zip(objectives, self._objective_weights)]
             reward = sum(weighted_objectives)
                     # - side_penality
