@@ -95,7 +95,7 @@ class RexGymEnv(gym.Env):
                  reflection=True,
                  log_path=None,
                  affordance = [-1,-1,-1,-1,-1],
-                 model = 'Walk'):
+                 model = 'Stand'):
         """Initialize the rex gym environment.
 
     Args:
@@ -477,31 +477,37 @@ class RexGymEnv(gym.Env):
     Returns:
       Boolean value that indicates whether rex has fallen.
     """
-        orientation = self.rex.GetBaseOrientation()
-        rot_mat = self._pybullet_client.getMatrixFromQuaternion(orientation)
-        local_up = rot_mat[6:]
-        pos = self.rex.GetBasePosition()
-        #  or pos[2] < 0.13
-        return (np.dot(np.asarray([0, 0, 1]), np.asarray(local_up)) < 0.85)
-
-    def _termination(self):
-        position = self.rex.GetBasePosition()
-        
-        o = self.rex.GetBaseOrientation()
-        
-        
-        if self.model == 'Stand':
+        if self.model == 'Stand' or self.model == 'Gallop':
+            
+            print("IS FALLEN!")
             roll, pitch, _ = self.rex.GetTrueBaseRollPitchYaw()
             return math.fabs(roll) > 0.3 or math.fabs(pitch) > 0.5
-        
         else:
-            if position[2] < 0.13:
-                print("IS FALLEN!")
-            
+            orientation = self.rex.GetBaseOrientation()
+            rot_mat = self._pybullet_client.getMatrixFromQuaternion(orientation)
+            local_up = rot_mat[6:]
+            pos = self.rex.GetBasePosition()
+            #  or pos[2] < 0.13
+            return (np.dot(np.asarray([0, 0, 1]), np.asarray(local_up)) < 0.85)
+
+    def _termination(self):
+        if self.model =='Stand': 
             if self.is_fallen():
-                print("IS ROTATING!")
-         
-            return self.is_fallen() or position[2] < 0.13
+                print('IS FALLEN!')
+
+            return self.is_fallen()
+        else:
+            if self.is_fallen():
+                print("IS FALLEN!")
+            o = self.rex.GetBaseOrientation()
+            
+            if self.model != 'Stand':
+
+                if o[1] < -0.13:
+                    print("IS ROTATING!")
+            return self.is_fallen() or o[1] < -0.13
+        
+
 
 
     #================================================
@@ -576,14 +582,16 @@ class RexGymEnv(gym.Env):
             current_base_position = self.rex.GetBasePosition()
             # side_penality = -abs(current_base_position[1])
             # forward direction
-            forward_reward = -current_base_position[0] + self._last_base_position[0]
+            x_dif = -current_base_position[0] + self._last_base_position[0]
+            y_dif = -current_base_position[1] + self._last_base_position[1]
+            forward_reward = - np.sqrt(x_dif**2 + y_dif**2)
             behavior_reward = 0.0
             if self.model =='Walk': 
                 if abs(forward_reward) <= 0.15:
-                    behavior_reward = 100 - abs(forward_reward)
+                    behavior_reward = -50 - abs(forward_reward)
             elif self.model == 'Gallop': 
                 if abs(forward_reward) >= 0.2:
-                    behavior_reward = 100 - abs(forward_reward)
+                    behavior_reward = -50 - abs(forward_reward)
 
             # target_reward = 0.0
             # if forward_reward >0:
@@ -591,16 +599,16 @@ class RexGymEnv(gym.Env):
             # Cap the forward reward if a cap is set.
             forward_reward = min(forward_reward, self._forward_reward_cap)
             # Penalty for sideways translation.
-            drift_reward = -abs(current_base_position[1] - self._last_base_position[1])
+            # drift_reward = -abs(current_base_position[1] - self._last_base_position[1])
             # Penalty for sideways rotation of the body.
             orientation = self.rex.GetBaseOrientation()
             rot_matrix = pybullet.getMatrixFromQuaternion(orientation)
             local_up_vec = rot_matrix[6:]
-            shake_reward = -abs(np.dot(np.asarray([1, 1, 0]), np.asarray(local_up_vec)))
+            shake_reward = -abs(np.dot(np.asarray([1, 1, 1]), np.asarray(local_up_vec)))
             energy_reward = -np.abs(
                 np.dot(self.rex.GetMotorTorques(),
                     self.rex.GetMotorVelocities())) * self._time_step
-            objectives = [forward_reward, behavior_reward, energy_reward, drift_reward, shake_reward]
+            objectives = [forward_reward, behavior_reward, energy_reward, shake_reward]
             weighted_objectives = [o * w for o, w in zip(objectives, self._objective_weights)]
             reward = sum(weighted_objectives)
                     # - side_penality
