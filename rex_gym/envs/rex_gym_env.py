@@ -479,7 +479,6 @@ class RexGymEnv(gym.Env):
     """
         if self.model == 'Stand' or self.model == 'Gallop':
             
-            print("IS FALLEN!")
             roll, pitch, _ = self.rex.GetTrueBaseRollPitchYaw()
             return math.fabs(roll) > 0.3 or math.fabs(pitch) > 0.5
         else:
@@ -496,15 +495,16 @@ class RexGymEnv(gym.Env):
                 print('IS FALLEN!')
 
             return self.is_fallen()
+            
         else:
             if self.is_fallen():
                 print("IS FALLEN!")
-            o = self.rex.GetBaseOrientation()
-            
-            if self.model != 'Stand':
 
-                if o[1] < -0.13:
-                    print("IS ROTATING!")
+            o = self.rex.GetBaseOrientation()
+
+            if o[1] < -0.13:
+                print("IS ROTATING!")
+
             return self.is_fallen() or o[1] < -0.13
         
 
