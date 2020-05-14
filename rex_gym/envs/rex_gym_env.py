@@ -354,7 +354,7 @@ class RexGymEnv(gym.Env):
             self.affordance = np.dot([1,1,1,1,1],model_index)
 
             self.model = Behavioral_models[model_index]
-            print(self.model)
+            #print(self.model)
 
             if self.model =='Turn Right' or self.model=='Turn Left': 
                 
@@ -492,18 +492,18 @@ class RexGymEnv(gym.Env):
     def _termination(self):
         if self.model =='Stand': 
             if self.is_fallen():
-                print('IS FALLEN!')
+                #print('IS FALLEN!')
 
             return self.is_fallen()
             
         else:
             if self.is_fallen():
-                print("IS FALLEN!")
+                #print("IS FALLEN!")
 
             o = self.rex.GetBaseOrientation()
 
             if o[1] < -0.13:
-                print("IS ROTATING!")
+                #print("IS ROTATING!")
 
             return self.is_fallen() or o[1] < -0.13
         
