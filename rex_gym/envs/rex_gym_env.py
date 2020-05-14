@@ -486,8 +486,8 @@ class RexGymEnv(gym.Env):
             rot_mat = self._pybullet_client.getMatrixFromQuaternion(orientation)
             local_up = rot_mat[6:]
             pos = self.rex.GetBasePosition()
-            #  or pos[2] < 0.13
-            return (np.dot(np.asarray([0, 0, 1]), np.asarray(local_up)) < 0.85)
+            #  
+            return (np.dot(np.asarray([0, 0, 1]), np.asarray(local_up)) < 0.85) or pos[2] < 0.13
 
     def _termination(self):
         if self.model =='Stand': 
