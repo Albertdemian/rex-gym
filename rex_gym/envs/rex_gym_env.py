@@ -491,18 +491,18 @@ class RexGymEnv(gym.Env):
 
     def _termination(self):
         if self.model =='Stand': 
-            if self.is_fallen():
+            #if self.is_fallen():
                 #print('IS FALLEN!')
 
             return self.is_fallen()
             
         else:
-            if self.is_fallen():
+            #if self.is_fallen():
                 #print("IS FALLEN!")
 
             o = self.rex.GetBaseOrientation()
 
-            if o[1] < -0.13:
+            #if o[1] < -0.13:
                 #print("IS ROTATING!")
 
             return self.is_fallen() or o[1] < -0.13
