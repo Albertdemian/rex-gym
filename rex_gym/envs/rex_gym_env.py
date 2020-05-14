@@ -76,7 +76,7 @@ class RexGymEnv(gym.Env):
                  motor_velocity_limit=np.inf,
                  pd_control_enabled=False,
                  leg_model_enabled=True,
-                 accurate_motor_model_enabled=False,
+                 accurate_motor_model_enabled=True,
                  remove_default_joint_damping=False,
                  motor_kp=1.0,
                  motor_kd=0.02,
@@ -84,7 +84,7 @@ class RexGymEnv(gym.Env):
                  pd_latency=0.0,
                  torque_control_enabled=False,
                  motor_overheat_protection=False,
-                 hard_reset=True,
+                 hard_reset=False,
                  on_rack=False,
                  render=True,
                  num_steps_to_log=1000,
@@ -354,7 +354,7 @@ class RexGymEnv(gym.Env):
             self.affordance = np.dot([1,1,1,1,1],model_index)
 
             self.model = Behavioral_models[model_index]
-            print(self.model)
+            #print(self.model)
 
             if self.model =='Turn Right' or self.model=='Turn Left': 
                 
@@ -492,18 +492,18 @@ class RexGymEnv(gym.Env):
     def _termination(self):
         if self.model =='Stand': 
             if self.is_fallen():
-                print('IS FALLEN!')
+                #print('IS FALLEN!')
 
             return self.is_fallen()
             
         else:
             if self.is_fallen():
-                print("IS FALLEN!")
+                #print("IS FALLEN!")
 
             o = self.rex.GetBaseOrientation()
 
             if o[1] < -0.13:
-                print("IS ROTATING!")
+                #print("IS ROTATING!")
 
             return self.is_fallen() or o[1] < -0.13
         
