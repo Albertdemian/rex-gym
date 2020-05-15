@@ -94,8 +94,8 @@ class RexGymEnv(gym.Env):
                  forward_reward_cap=float("inf"),
                  reflection=True,
                  log_path=None,
-                 affordance = [-1,-1,-1,-1,-1],
-                 model = 'Stand'):
+                 affordance = [0,0,0,0,0]
+                 model = 'Walk'):
         """Initialize the rex gym environment.
 
     Args:
@@ -251,7 +251,7 @@ class RexGymEnv(gym.Env):
     def add_env_randomizer(self, env_randomizer):
         self._env_randomizers.append(env_randomizer)
 
-    def reset(self, initial_motor_angles=Rex.INIT_POSES['rest_position'], reset_duration=1.0):
+    def reset(self, initial_motor_angles=Rex.INIT_POSES['stand_high'], reset_duration=1.0):
         self._pybullet_client.configureDebugVisualizer(self._pybullet_client.COV_ENABLE_RENDERING, 0)
         # @TODO fix logging
         # if self._env_step_counter > 0:
@@ -259,8 +259,8 @@ class RexGymEnv(gym.Env):
         # self._episode_proto = rex_logging_pb2.RexEpisode()
         # rex_logging.preallocate_episode_proto(self._episode_proto, self._num_steps_to_log)
         #===========================
-        self.model = 'Stand'
-        self.affordance = [-1,-1,-1,-1,-1]
+        self.model = 'Walk'
+        self.affordance = [0,0,0,0,0]
         #=============================
         
         if self._hard_reset:
