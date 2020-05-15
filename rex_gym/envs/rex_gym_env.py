@@ -94,7 +94,7 @@ class RexGymEnv(gym.Env):
                  forward_reward_cap=float("inf"),
                  reflection=True,
                  log_path=None,
-                 affordance = [0,0,0,0,0]
+                 affordance = [0,0,0,0,0],
                  model = 'Walk'):
         """Initialize the rex gym environment.
 
