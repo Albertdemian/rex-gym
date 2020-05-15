@@ -301,7 +301,7 @@ class Rex(object):
         reset_time <= 0 or in torque control mode, the phase of holding the
         default pose is skipped.
     """
-        print("reset")
+        #print("reset")
         if self._on_rack:
             init_position = INIT_RACK_POSITION
         else:
