@@ -86,7 +86,7 @@ class RexGymEnv(gym.Env):
                  motor_overheat_protection=False,
                  hard_reset=False,
                  on_rack=False,
-                 render=True,
+                 render=False,
                  num_steps_to_log=1000,
                  action_repeat=1,
                  control_time_step=None,
